@@ -1,0 +1,227 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>手机号码批量提取工具</title>
+<style>
+*{box-sizing:border-box}
+body{
+    margin:0;padding:25px;
+    background:#f3f6fb;
+    font-family:"Microsoft YaHei",Arial;
+    color:#263445
+}
+.container{
+    max-width:1100px;margin:20px auto;
+    padding:25px;background:white;
+    border-radius:12px;
+    box-shadow:0 5px 25px #0000000d
+}
+h2{text-align:center;color:#1677ff}
+.desc{text-align:center;color:#888;font-size:13px}
+textarea{
+    width:100%;height:260px;padding:14px;
+    border:1px solid #dce3ec;border-radius:8px;
+    resize:vertical;font-size:14px;
+    line-height:1.6;font-family:Consolas,monospace
+}
+textarea:focus{outline:none;border-color:#1677ff}
+label{display:block;font-weight:bold;margin:20px 0 10px}
+.buttons{display:flex;gap:10px;flex-wrap:wrap;margin:15px 0}
+button{
+    padding:11px 23px;border:0;border-radius:7px;
+    color:white;cursor:pointer;font-size:14px
+}
+button:hover{opacity:.85}
+.blue{background:#1677ff}
+.green{background:#16a36a}
+.orange{background:#f59e0b}
+.red{background:#e05252}
+.statistics{
+    display:grid;grid-template-columns:repeat(4,1fr);
+    gap:12px;margin:20px 0
+}
+.stat{
+    background:#f3f7ff;padding:17px;
+    text-align:center;border-radius:8px
+}
+.stat span{display:block;color:#888;font-size:13px}
+.stat strong{
+    display:block;margin-top:8px;
+    font-size:24px;color:#1677ff
+}
+.status{font-size:13px;color:#16a36a;margin-top:10px}
+.output{background:#f8fafc}
+@media(max-width:650px){
+    body{padding:10px}
+    .statistics{grid-template-columns:repeat(2,1fr)}
+    .container{padding:15px}
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<h2>手机号码批量提取工具</h2>
+<p class="desc">大批量号码自动提取 · 保留原始顺序 · 不去重</p>
+
+<label>① 原始被叫号码</label>
+<textarea id="input" placeholder="请在这里粘贴号码，粘贴后自动提取..."></textarea>
+
+<div class="statistics">
+    <div class="stat">
+        <span>原始号码数量</span>
+        <strong id="total">0</strong>
+    </div>
+    <div class="stat">
+        <span>成功提取数量</span>
+        <strong id="success">0</strong>
+    </div>
+    <div class="stat">
+        <span>未匹配数量</span>
+        <strong id="failed">0</strong>
+    </div>
+    <div class="stat">
+        <span>重复号码数量</span>
+        <strong id="duplicate">0</strong>
+    </div>
+</div>
+
+<div class="buttons">
+    <button class="blue" onclick="extract()">重新提取</button>
+    <button class="green" onclick="copyResult()">复制结果</button>
+    <button class="orange" onclick="downloadResult()">导出TXT</button>
+    <button class="red" onclick="clearAll()">清空</button>
+</div>
+
+<label>② 提取结果</label>
+<textarea id="output" class="output" readonly
+placeholder="提取结果自动显示在这里..."></textarea>
+
+<div class="status" id="status">等待粘贴号码...</div>
+
+</div>
+
+<script>
+const input = document.getElementById("input");
+const output = document.getElementById("output");
+
+let timer = null;
+let resultList = [];
+
+function extract(){
+
+    const text = input.value;
+
+    if(!text.trim()){
+        output.value = "";
+        resultList = [];
+        update(0,0,0,0);
+        document.getElementById("status").textContent = "等待粘贴号码...";
+        return;
+    }
+
+    // 按原始顺序提取所有数字串
+    const tokens = text.match(/\d+/g) || [];
+
+    let results = [];
+    let duplicateCount = 0;
+    let seen = new Set();
+
+    // 号码规则：去掉开头的0，再识别11位手机号
+    const phonePattern = /^1[3-9]\d{9}$/;
+
+    tokens.forEach(token => {
+
+        // 去掉号码开头所有0
+        let phone = token.replace(/^0+/, "");
+
+        // 判断是否为11位手机号码
+        if(phonePattern.test(phone)){
+
+            results.push(phone);
+
+            if(seen.has(phone)){
+                duplicateCount++;
+            }else{
+                seen.add(phone);
+            }
+        }
+    });
+
+    resultList = results;
+
+    // 保留原始顺序，不去重
+    output.value = results.join("\n");
+
+    update(
+        tokens.length,
+        results.length,
+        tokens.length - results.length,
+        duplicateCount
+    );
+
+    document.getElementById("status").textContent =
+        "提取完成，共找到 " + results.length + " 个手机号码";
+}
+
+function update(a,b,c,d){
+    document.getElementById("total").textContent=a.toLocaleString();
+    document.getElementById("success").textContent=b.toLocaleString();
+    document.getElementById("failed").textContent=c.toLocaleString();
+    document.getElementById("duplicate").textContent=d.toLocaleString();
+}
+
+// 粘贴后自动提取，输入时稍作等待
+input.addEventListener("input",function(){
+    clearTimeout(timer);
+    document.getElementById("status").textContent="正在等待输入...";
+    timer=setTimeout(extract,300);
+});
+
+// 复制
+async function copyResult(){
+    if(!output.value)return;
+    try{
+        await navigator.clipboard.writeText(output.value);
+        document.getElementById("status").textContent="复制成功";
+    }catch(e){
+        output.select();
+        document.execCommand("copy");
+        document.getElementById("status").textContent="复制完成";
+    }
+}
+
+// 导出TXT
+function downloadResult(){
+    if(!output.value)return;
+
+    const blob=new Blob(
+        ["\uFEFF"+output.value],
+        {type:"text/plain;charset=utf-8"}
+    );
+
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download="正常手机号码提取结果.txt";
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+
+    document.getElementById("status").textContent="TXT文件已生成";
+}
+
+// 清空
+function clearAll(){
+    input.value="";
+    output.value="";
+    resultList=[];
+    update(0,0,0,0);
+    document.getElementById("status").textContent="已清空，等待粘贴号码...";
+}
+</script>
+</body>
+</html>
